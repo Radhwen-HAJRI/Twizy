@@ -1,0 +1,17 @@
+# Créer le fichier .gitignore
+@"
+# Modèles (trop lourds pour git)
+*.pt
+*.pth
+runs/
+__pycache__/
+*.pyc
+
+# Dataset (déjà dans zip)
+data/raw/
+data/processed/
+
+# Environnement
+.env
+*.egg-info/
+"@ | Out-File -Encoding utf8 .gitignore

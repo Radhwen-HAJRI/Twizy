@@ -1,0 +1,8 @@
+model:
+  name: 'yolov8n-cls.pt' # YOLOv8 Nano pour la classification
+  epochs: 20
+  img_size: 64 # Taille standard pour des crops de panneaux
+  
+paths:
+  dataset_raw: './dataset'
+  dataset_yolo: './dataset_yolo_format'
