@@ -1,0 +1,16 @@
+{
+  "id": 9,
+  "source": "p5",
+  "cx_original": 643,
+  "cy_original": 295,
+  "r_original": 32,
+  "crop_x1": 560,
+  "crop_y1": 212,
+  "crop_x2": 726,
+  "crop_y2": 378,
+  "cx_crop": 83,
+  "cy_crop": 83,
+  "r_crop": 32,
+  "largeur_crop": 166,
+  "hauteur_crop": 166
+}

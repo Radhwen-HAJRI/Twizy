@@ -1,0 +1,16 @@
+{
+  "id": 1,
+  "frame": 90,
+  "cx_original": 659,
+  "cy_original": 463,
+  "r_original": 19,
+  "white_ratio": 0,597,
+  "red_ring_ratio": 0,533,
+  "crop_x1": 635,
+  "crop_y1": 439,
+  "crop_x2": 683,
+  "crop_y2": 487,
+  "cx_crop": 24,
+  "cy_crop": 24,
+  "r_crop": 19
+}
