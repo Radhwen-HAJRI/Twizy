@@ -1,10 +1,4 @@
-"""
-sign_detector.py  v7
-====================
-Nouveaute : get_rois() retourne aussi la COULEUR DOMINANTE de chaque ROI
-(red / blue / yellow) pour que le pipeline puisse valider la coherence
-avec la prediction YOLO.
-"""
+
 
 import cv2
 import numpy as np
@@ -102,7 +96,7 @@ class SignDetector:
                     print(f"  [REJET fill={fill:.2f}] ({x},{y},{w},{h})")
                 continue
 
-            # Couleur dominante dans cette ROI
+            
             r_px = cv2.countNonZero(mask_red  [y:y+h, x:x+w])
             b_px = cv2.countNonZero(mask_blue [y:y+h, x:x+w])
             y_px = cv2.countNonZero(mask_yellow[y:y+h, x:x+w])

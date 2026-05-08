@@ -1,13 +1,4 @@
-"""
-pipeline.py  v5
-===============
-Ajout : filtre de COHERENCE COULEUR
-  - Zone rouge  → impossible : feu vert, feu orange, panneaux bleus obligation
-  - Zone bleue  → impossible : stop, sens interdit, vitesse, feux rouges
-  - Zone jaune  → panneaux danger/triangle uniquement
 
-Aussi : fix encodage "—" remplace par "-"
-"""
 
 import argparse
 import cv2
@@ -18,8 +9,7 @@ from sign_detector import SignDetector
 from classifier   import SignClassifier
 
 
-# ─── Classes par couleur attendue ─────────────────────────────────────────────
-# Quand OpenCV dit "rouge" → seules ces classes sont valides
+
 RED_CLASSES = {
     "Speed_limit_20_km_h", "Speed_limit_30_km_h", "Speed_limit_50_km_h",
     "Speed_limit_60_km_h", "Speed_limit_70_km_h", "Speed_limit_80_km_h",
@@ -45,32 +35,28 @@ YELLOW_CLASSES = {
     "Beware_of_ice_snow",
 }
 
-# Feux de circulation : verts/oranges uniquement dans zones rouges/bleues
+
 TRAFFIC_LIGHTS = {"green-lights", "yellow-lights", "red-lights"}
 
 
 def _color_coherent(label: str, color: str) -> bool:
-    """
-    Verifie que la classe YOLO est coherente avec la couleur OpenCV.
-    Retourne True si OK, False si incohérent (faux positif de classification).
-    """
+    
     label_low = label.lower()
 
-    # Feux de signalisation : coherent avec rouge et bleu (pas jaune)
     if label in TRAFFIC_LIGHTS:
-        if label == "green-lights":  return True   # accepté partout (rare)
+        if label == "green-lights":  return True   
         if label == "red-lights":    return color in ("red", "blue")
         return color in ("red", "blue")
 
     if label in RED_CLASSES:    return color in ("red",)
     if label in BLUE_CLASSES:   return color in ("blue",)
-    if label in YELLOW_CLASSES: return color in ("yellow", "red")  # triangles rouges aussi
+    if label in YELLOW_CLASSES: return color in ("yellow", "red")  
 
-    # Classe inconnue : on accepte
+    
     return True
 
 
-# ─── Affichage lisible des classes ────────────────────────────────────────────
+
 CLASS_LABELS = {
     "Speed_limit_20_km_h":  ("Limite 20 km/h",   (0, 50, 220)),
     "Speed_limit_30_km_h":  ("Limite 30 km/h",   (0, 50, 220)),
@@ -123,7 +109,7 @@ def _get_display(label: str):
     return label.replace("_", " "), DEFAULT_COLOR
 
 
-# ─── Dessin ───────────────────────────────────────────────────────────────────
+
 def _draw_box(img, x, y, w, h, color, text):
     cv2.rectangle(img, (x, y), (x+w, y+h), color, 2)
     c = 14
@@ -144,7 +130,7 @@ def _draw_box(img, x, y, w, h, color, text):
     cv2.putText(img, text,(x+3, ty-bl), font, scale,(255,255,255),thick,cv2.LINE_AA)
 
 
-# ─── Frame ────────────────────────────────────────────────────────────────────
+
 def process_frame(frame, detector, classifier):
     rois      = detector.get_rois(frame)
     annotated = frame.copy()
@@ -160,9 +146,9 @@ def process_frame(frame, detector, classifier):
         if label == "Inconnu":
             continue
 
-        # ── FILTRE COHERENCE COULEUR ─────────────────────────────────────────
+        
         if not _color_coherent(label, det_color):
-            continue   # classification incohérente avec la couleur détectée
+            continue   
 
         found += 1
         display, color = _get_display(label)
@@ -176,7 +162,7 @@ def process_frame(frame, detector, classifier):
     return annotated
 
 
-# ─── Rapport ──────────────────────────────────────────────────────────────────
+
 def _report(items):
     print("\n" + "="*60)
     print(f"  RAPPORT - {len(items)} panneau(x) reconnu(s)")
@@ -192,7 +178,7 @@ def _report(items):
     print("="*60 + "\n")
 
 
-# ─── Main ─────────────────────────────────────────────────────────────────────
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--weights",   required=True)

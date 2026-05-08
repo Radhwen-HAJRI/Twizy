@@ -1,17 +1,16 @@
-# Créer le fichier .gitignore
 @"
-# Modèles (trop lourds pour git)
+# Modeles YOLO (trop lourds)
 *.pt
 *.pth
 runs/
-__pycache__/
-*.pyc
 
-# Dataset (déjà dans zip)
+# Dataset
 data/raw/
 data/processed/
+*.zip
 
-# Environnement
+# Python
+__pycache__/
+*.pyc
 .env
-*.egg-info/
 "@ | Out-File -Encoding utf8 .gitignore

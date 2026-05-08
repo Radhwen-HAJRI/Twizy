@@ -1,49 +1,23 @@
-"""
-classifier.py — Chargement et inférence du modèle YOLOv8
-=========================================================
-Corrections vs version précédente :
-  • Seuil de confiance configurable (défaut 0.55)
-  • Retourne "Inconnu" uniquement sous le seuil
-  • top_k pour afficher plusieurs candidats
-"""
+
 
 from ultralytics import YOLO
 import numpy as np
 
 
-# Seuil de confiance par défaut.
-# En dessous : on considère que le modèle ne sait pas.
+
 DEFAULT_CONF_THRESHOLD = 0.55
 
 
 class SignClassifier:
-    """
-    Wrapper YOLOv8 classification.
-
-    Paramètres
-    ----------
-    model_path : str
-        Chemin vers le fichier best.pt entraîné.
-    conf_threshold : float
-        Confiance minimale pour accepter une prédiction.
-        Tout ce qui est en dessous → "Inconnu".
-    """
+   
 
     def __init__(self, model_path: str, conf_threshold: float = DEFAULT_CONF_THRESHOLD):
         self.model = YOLO(model_path)
         self.conf_threshold = conf_threshold
 
     def predict(self, roi_image: np.ndarray) -> tuple[str, float]:
-        """
-        Prédit la classe d'un ROI (image BGR numpy).
-
-        Retourne
-        --------
-        label : str
-            Nom de la classe ou "Inconnu" si sous le seuil.
-        confidence : float
-            Score de confiance (0.0 → 1.0).
-        """
+        
+        
         results = self.model(roi_image, verbose=False)
         probs = results[0].probs
 
@@ -57,13 +31,7 @@ class SignClassifier:
         return label, conf
 
     def predict_topk(self, roi_image: np.ndarray, k: int = 3) -> list[dict]:
-        """
-        Retourne les k meilleures prédictions (filtrées par seuil).
-
-        Retourne
-        --------
-        list of {"label": str, "conf": float}
-        """
+        
         results = self.model(roi_image, verbose=False)
         probs   = results[0].probs
         names   = results[0].names
