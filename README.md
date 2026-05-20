@@ -127,15 +127,3 @@ Twizzy/
 - **DM Sans + JetBrains Mono** — typographie
 
 ---
-
-## Problèmes fréquents
-
-| Problème | Solution |
-|----------|----------|
-| `TensorFlow model not loaded` | Vérifier que `Detection_panneaux/my_model.keras` existe |
-| `YOLOv8 model not loaded` | Vérifier que `runs/detect/train13/weights/best.pt` existe |
-| `libvlc.dll introuvable` | Installer VLC 64 bits dans `C:\Program Files\VideoLAN\VLC` |
-| `Connection refused` | Lancer `python app.py` avant l'interface Java |
-| Erreur compilation Java | Vérifier JDK 17+ : `java -version` |
-| `No module named flask_cors` | `pip install flask-cors` |
-| `No module named cv2` | `pip install opencv-python` |
