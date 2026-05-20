@@ -122,7 +122,7 @@ Twizzy/
 - **JSON.org** — parsing des réponses API
 
 ### Interface web
-- **HTML / CSS / JavaScript** — interface responsive
+- **HTML** — interface responsive
 - **Fetch API** — communication avec Flask
 - **DM Sans + JetBrains Mono** — typographie
 
