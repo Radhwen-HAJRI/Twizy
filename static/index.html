@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Twizzy — Détection de Panneaux</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0d14; --panel: #10141e; --card: #141820; --sidebar: #0e1218;
+    --blue: #388bfd; --green: #23c570; --red: #f85149; --purple: #a371f7;
+    --text: #dce3eb; --muted: #646e82; --border: #232a3c; --border-lt: #37415a;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  .app { display: flex; flex: 1; overflow: hidden; }
+
+  /* SIDEBAR */
+  .sidebar { width: 230px; min-width: 230px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+  .logo { display: flex; align-items: center; gap: 12px; padding: 22px 16px 20px; border-bottom: 1px solid var(--border); }
+  .logo-circle { width: 36px; height: 36px; border-radius: 50%; background: rgba(56,139,253,0.12); border: 2px solid rgba(56,139,253,0.4); display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 15px; color: var(--blue); flex-shrink: 0; }
+  .logo-text { display: flex; flex-direction: column; gap: 2px; }
+  .logo-text strong { font-size: 13px; font-weight: 600; color: var(--text); }
+  .logo-text span { font-size: 10px; color: var(--muted); }
+  .section-title { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .08em; padding: 14px 18px 6px; }
+  .sidebar-btn { display: flex; align-items: center; gap: 12px; padding: 0 16px; height: 42px; background: none; border: none; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; width: 100%; text-align: left; position: relative; transition: background .15s; }
+  .sidebar-btn:hover { background: rgba(255,255,255,0.04); }
+  .sidebar-btn:hover .bar { opacity: 1; }
+  .bar { position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 22px; border-radius: 0 3px 3px 0; opacity: 0; transition: opacity .15s; }
+  .btn-icon { width: 18px; height: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .btn-icon svg { width: 16px; height: 16px; }
+  .sidebar-divider { height: 1px; background: var(--border); margin: 8px 0; }
+  .slider-block { padding: 4px 18px 8px; }
+  .slider-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  input[type=range] { width: 100%; accent-color: var(--blue); cursor: pointer; }
+  .sidebar-footer { margin-top: auto; border-top: 1px solid var(--border); padding: 10px 16px 14px; display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--muted); }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* TABS */
+  .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--panel); flex-shrink: 0; }
+  .tab { padding: 0 20px; height: 48px; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s; background: none; border-top: none; border-left: none; border-right: none; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text); border-bottom-color: var(--blue); }
+  .tab svg { width: 15px; height: 15px; }
+
+  /* CONTENT */
+  .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .tab-panel { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+  .tab-panel.active { display: flex; }
+
+  /* BANNER */
+  .banner { border-bottom: 2px solid var(--green); color: #b4ffd0; font-size: 13px; font-weight: 600; padding: 0 20px; height: 0; overflow: hidden; display: flex; align-items: center; gap: 10px; transition: height .25s; flex-shrink: 0; background: #16522d; }
+  .banner.visible { height: 42px; }
+
+  /* CARDS IMAGE */
+  .cards-area { flex: 1; padding: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; overflow: auto; }
+  .card { background: var(--card); border: 1px solid var(--border-lt); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+  .card::before { content: ''; position: absolute; top: 0; left: 20px; right: 20px; height: 2px; border-radius: 0 0 4px 4px; }
+  .card.blue::before { background: var(--blue); }
+  .card.green::before { background: var(--green); }
+  .card.purple::before { background: var(--purple); }
+  .card-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .card-dot { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .card-dot.blue  { background: rgba(56,139,253,0.15); }
+  .card-dot.green { background: rgba(35,197,112,0.15); }
+  .card-dot.purple{ background: rgba(163,113,247,0.15); }
+  .card-dot svg { width: 11px; height: 11px; }
+  .card-title { font-size: 12px; font-weight: 600; color: var(--text); }
+  .card-body { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; min-height: 260px; }
+  .placeholder { font-size: 13px; color: var(--muted); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .placeholder svg { width: 36px; height: 36px; opacity: .3; }
+  .card-img { max-width: 100%; max-height: 100%; border-radius: 8px; display: none; object-fit: contain; }
+  .spinner { width: 28px; height: 28px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* VIDEO TAB */
+  .video-area { flex: 1; padding: 18px; display: flex; flex-direction: column; gap: 14px; overflow: auto; }
+  .video-upload-zone { border: 2px dashed var(--border-lt); border-radius: 14px; padding: 32px 20px; display: flex; flex-direction: column; align-items: center; gap: 12px; cursor: pointer; transition: all .2s; background: var(--card); flex-shrink: 0; }
+  .video-upload-zone:hover, .video-upload-zone.drag-over { border-color: var(--blue); background: rgba(56,139,253,0.05); }
+  .video-upload-zone svg { width: 40px; height: 40px; opacity: .35; }
+  .video-upload-zone p { font-size: 13px; color: var(--muted); text-align: center; }
+  .video-upload-zone strong { color: var(--blue); }
+  .video-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .progress-wrap { display: none; flex-direction: column; gap: 6px; }
+  .progress-label { font-size: 11px; color: var(--muted); }
+  .progress-bar { width: 100%; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--blue); width: 0%; transition: width .3s; border-radius: 2px; }
+  .detections-list { background: var(--card); border: 1px solid var(--border-lt); border-radius: 14px; padding: 16px; max-height: 180px; overflow-y: auto; display: none; flex-shrink: 0; }
+  .detections-list h3 { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .08em; margin-bottom: 10px; }
+  .detection-item { display: flex; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .detection-item:last-child { border-bottom: none; }
+  .det-time { color: var(--muted); font-family: 'JetBrains Mono', monospace; min-width: 50px; }
+  .det-label { color: var(--green); font-weight: 600; }
+  .det-conf { color: var(--muted); margin-left: auto; font-family: 'JetBrains Mono', monospace; }
+  .analyze-btn { background: var(--green); color: #fff; border: none; border-radius: 8px; padding: 10px 24px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s; display: none; align-self: flex-start; }
+  .analyze-btn:hover { opacity: .85; }
+
+  /* DETECTION POPUP */
+  .detection-popup { position: fixed; top: 70px; right: 20px; background: #16522d; border: 1px solid var(--green); border-radius: 12px; padding: 14px 18px; display: none; flex-direction: column; gap: 4px; z-index: 100; animation: slideIn .3s ease; box-shadow: 0 8px 32px rgba(0,0,0,0.4); min-width: 240px; }
+  .detection-popup.visible { display: flex; }
+  .det-popup-title { font-size: 10px; color: var(--green); font-weight: 600; letter-spacing: .08em; }
+  .det-popup-label { font-size: 18px; font-weight: 700; color: #b4ffd0; }
+  .det-popup-sub { font-size: 11px; color: rgba(180,255,208,0.6); }
+  @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* STATUS BAR */
+  .statusbar { height: 28px; background: var(--sidebar); border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 18px; font-size: 11px; color: var(--muted); flex-shrink: 0; font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+
+<!-- DETECTION POPUP (vidéo) -->
+<div class="detection-popup" id="detPopup">
+  <div class="det-popup-title">PANNEAU DÉTECTÉ</div>
+  <div class="det-popup-label" id="detPopupLabel">—</div>
+  <div class="det-popup-sub" id="detPopupSub">—</div>
+</div>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-circle">T</div>
+      <div class="logo-text"><strong>Twizzy</strong><span>Détection Panneaux IA</span></div>
+    </div>
+
+    <div class="section-title">ACTIONS</div>
+
+    <label class="sidebar-btn" id="chooseImageBtn" style="cursor:pointer">
+      <div class="bar" style="background:var(--blue)"></div>
+      <div class="btn-icon">
+        <svg fill="none" stroke="var(--blue)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      Choisir une image
+      <input type="file" accept="image/*" id="fileInput" style="display:none" onchange="loadImage(this)">
+    </label>
+
+    <button class="sidebar-btn" id="detectBtn" onclick="detect()">
+      <div class="bar" style="background:var(--green)"></div>
+      <div class="btn-icon">
+        <svg fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </div>
+      Détecter le panneau
+    </button>
+
+    <button class="sidebar-btn" onclick="clearAll()">
+      <div class="bar" style="background:var(--red)"></div>
+      <div class="btn-icon">
+        <svg fill="none" stroke="var(--red)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      </div>
+      Effacer
+    </button>
+
+    <div class="sidebar-divider"></div>
+    <div class="section-title">OPTIONS</div>
+    <div class="slider-block">
+      <div class="slider-label" id="zoomLabel">Zoom : 70%</div>
+      <input type="range" min="20" max="100" value="70" oninput="updateZoom(this.value)">
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="status-dot"></div>
+      v1.0 &nbsp;•&nbsp; ISN 2A &nbsp;•&nbsp; 2025-2026
+    </div>
+  </aside>
+
+  <!-- CONTENT -->
+  <div class="content">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('image', this)">
+        <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        IMAGE
+      </button>
+      <button class="tab" onclick="switchTab('video', this)">
+        <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        VIDÉO
+      </button>
+    </div>
+
+    <!-- ── TAB IMAGE ── -->
+    <div class="tab-panel active" id="tab-image">
+      <div class="banner" id="imageBanner">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        <span id="imageBannerText"></span>
+      </div>
+      <div class="cards-area">
+        <div class="card blue" ondragover="dragOver(event)" ondrop="drop(event)">
+          <div class="card-header">
+            <div class="card-dot blue">
+              <svg fill="none" stroke="var(--blue)" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </div>
+            <span class="card-title">Image originale</span>
+          </div>
+          <div class="card-body">
+            <div class="placeholder" id="phLeft">
+              <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Choisir une image ou glisser-déposer ici
+            </div>
+            <img id="imgLeft" class="card-img">
+          </div>
+        </div>
+        <div class="card green">
+          <div class="card-header">
+            <div class="card-dot green">
+              <svg fill="none" stroke="var(--green)" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            </div>
+            <span class="card-title">Résultat de détection</span>
+          </div>
+          <div class="card-body">
+            <div class="placeholder" id="phRight">
+              <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              En attente de détection...
+            </div>
+            <div class="spinner" id="spinner"></div>
+            <img id="imgRight" class="card-img">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB VIDÉO ── -->
+    <div class="tab-panel" id="tab-video">
+      <div class="banner" id="videoBanner">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        <span id="videoBannerText"></span>
+      </div>
+      <div class="video-area">
+        <label class="video-upload-zone" id="videoZone" ondragover="videoDragOver(event)" ondrop="videoDrop(event)" ondragleave="videoDragLeave(event)">
+          <svg fill="none" stroke="var(--muted)" stroke-width="1.5" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+          <p id="videoZoneText">Glisser-déposer une vidéo ici<br>ou <strong>cliquer pour choisir</strong></p>
+          <p style="font-size:11px;color:var(--muted)">MP4, AVI, MKV, MOV</p>
+          <input type="file" accept="video/*" id="videoInput" style="display:none" onchange="loadVideo(this)">
+        </label>
+
+        <button class="analyze-btn" id="analyzeBtn" onclick="analyzeVideo()">🔍  Analyser la vidéo</button>
+
+        <div class="progress-wrap" id="progressWrap">
+          <div class="progress-label" id="progressLabel">Analyse en cours...</div>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        </div>
+
+        <div class="video-cards" id="videoCards" style="display:none">
+          <div class="card blue">
+            <div class="card-header">
+              <div class="card-dot blue">
+                <svg fill="none" stroke="var(--blue)" stroke-width="2" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+              </div>
+              <span class="card-title">Vidéo originale</span>
+            </div>
+            <div class="card-body">
+              <video id="videoPlayer" style="max-width:100%;max-height:320px;border-radius:8px;display:none" controls></video>
+              <div class="placeholder" id="phVideo">
+                <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="width:36px;height:36px;opacity:.3"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                Aucune vidéo chargée
+              </div>
+            </div>
+          </div>
+          <div class="card green">
+            <div class="card-header">
+              <div class="card-dot green">
+                <svg fill="none" stroke="var(--green)" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              </div>
+              <span class="card-title" id="videoResultTitle">Résultat YOLO</span>
+            </div>
+            <div class="card-body">
+              <div class="placeholder" id="phVideoResult">
+                <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="width:36px;height:36px;opacity:.3"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                En attente d'analyse...
+              </div>
+              <div class="spinner" id="videoSpinner"></div>
+              <img id="videoResultImg" style="max-width:100%;max-height:320px;border-radius:8px;display:none">
+            </div>
+          </div>
+        </div>
+
+        <div class="detections-list" id="detectionsList">
+          <h3>TOUTES LES DÉTECTIONS</h3>
+          <div id="detectionsContent"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="statusbar">
+      <span id="statusText">Prêt.</span>
+      <span>localhost:5000 &nbsp;•&nbsp; Twizzy v1.0</span>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentFile = null;
+let currentVideo = null;
+let videoFrames = [];
+let frameIdx = 0;
+let zoom = 0.7;
+let slideInterval = null;
+let popupTimeout = null;
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('chooseImageBtn').style.display = name === 'image' ? 'flex' : 'none';
+  document.getElementById('detectBtn').style.display     = name === 'image' ? 'flex' : 'none';
+}
+
+// ── IMAGE ─────────────────────────────────────────────────────────────────────
+function loadImage(input) {
+  if (!input.files[0]) return;
+  currentFile = input.files[0];
+  show('imgLeft', 'phLeft', URL.createObjectURL(currentFile));
+  hide('imgRight'); showEl('phRight');
+  hideBanner('image');
+  setStatus('Image chargée : ' + currentFile.name);
+}
+
+async function detect() {
+  if (!currentFile) { alert('Choisissez d\'abord une image.'); return; }
+  setStatus('Détection en cours…');
+  document.getElementById('spinner').style.display = 'block';
+  hideEl('phRight'); hide('imgRight');
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const resp = await fetch('http://127.0.0.1:5000/predict', {
+        method: 'POST', headers: {'Content-Type': 'application/octet-stream'}, body: e.target.result
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      const label = formatLabel(data.class);
+      show('imgRight', 'phRight', 'data:image/jpeg;base64,' + data.image);
+      showBanner('image', '✓  Panneau détecté : ' + label);
+      setStatus('✓ Détecté : ' + label);
+    } catch(err) {
+      setStatus('Erreur : ' + err.message);
+      showEl('phRight');
+    } finally {
+      document.getElementById('spinner').style.display = 'none';
+    }
+  };
+  reader.readAsArrayBuffer(currentFile);
+}
+
+function clearAll() {
+  currentFile = null;
+  hide('imgLeft'); showEl('phLeft');
+  hide('imgRight'); showEl('phRight');
+  hideBanner('image');
+  setStatus('Effacé.');
+  document.getElementById('fileInput').value = '';
+}
+
+// ── VIDEO ─────────────────────────────────────────────────────────────────────
+function loadVideo(input) {
+  if (!input.files[0]) return;
+  currentVideo = input.files[0];
+  const url = URL.createObjectURL(currentVideo);
+  const player = document.getElementById('videoPlayer');
+  player.src = url;
+  player.style.display = 'block';
+  hideEl('phVideo');
+  document.getElementById('videoCards').style.display = 'grid';
+  document.getElementById('analyzeBtn').style.display = 'inline-block';
+  document.getElementById('videoZoneText').innerHTML = '✓ <strong>' + currentVideo.name + '</strong>';
+  setStatus('Vidéo chargée : ' + currentVideo.name);
+}
+
+async function analyzeVideo() {
+  if (!currentVideo) return;
+  setStatus('Analyse en cours…');
+  document.getElementById('analyzeBtn').style.display = 'none';
+  document.getElementById('progressWrap').style.display = 'flex';
+  document.getElementById('videoSpinner').style.display = 'block';
+  hideEl('phVideoResult');
+  hideBanner('video');
+  if (slideInterval) clearInterval(slideInterval);
+
+  let prog = 0;
+  const progInt = setInterval(() => {
+    prog = Math.min(prog + 1.5, 88);
+    document.getElementById('progressFill').style.width = prog + '%';
+  }, 400);
+
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const resp = await fetch('http://127.0.0.1:5000/predict_video', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/octet-stream'},
+        body: e.target.result
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+
+      clearInterval(progInt);
+      document.getElementById('progressFill').style.width = '100%';
+      document.getElementById('progressLabel').textContent = 'Analyse terminée !';
+      document.getElementById('videoSpinner').style.display = 'none';
+
+      videoFrames = data.frames || [];
+      frameIdx = 0;
+
+      if (videoFrames.length > 0) {
+        document.getElementById('videoResultImg').src = 'data:image/jpeg;base64,' + videoFrames[0].image;
+        document.getElementById('videoResultImg').style.display = 'block';
+        document.getElementById('videoResultTitle').textContent = `Résultat YOLO (${data.analyzed_frames} frames analysées)`;
+      }
+
+      // Détections list
+      if (data.detections && data.detections.length > 0) {
+        document.getElementById('detectionsList').style.display = 'block';
+        document.getElementById('detectionsContent').innerHTML = data.detections.map(d => `
+          <div class="detection-item">
+            <span class="det-time">${d.time}s</span>
+            <span class="det-label">${formatLabel(d.class)}</span>
+            <span class="det-conf">${Math.round(d.confidence * 100)}%</span>
+          </div>`).join('');
+      }
+
+      // Slideshow avec popup à chaque détection
+      if (videoFrames.length > 0) {
+        slideInterval = setInterval(() => {
+          frameIdx = (frameIdx + 1) % videoFrames.length;
+          const f = videoFrames[frameIdx];
+          document.getElementById('videoResultImg').src = 'data:image/jpeg;base64,' + f.image;
+
+          // Cherche une détection sur cette frame
+          const det = data.detections ? data.detections.find(d => d.frame === f.frame) : null;
+          if (det) {
+            const label = formatLabel(det.class);
+            // Banner en haut
+            showBanner('video', `⏱ ${f.time}s  —  ${label}  (${Math.round(det.confidence * 100)}%)`);
+            // Popup coin haut droit
+            showDetPopup(label, `Frame ${f.frame}  •  ${Math.round(det.confidence * 100)}% confiance  •  ${f.time}s`);
+          } else {
+            hideBanner('video');
+          }
+        }, 800);
+      }
+
+      setStatus(`✓ ${data.detections ? data.detections.length : 0} détection(s) sur ${data.analyzed_frames} frames analysées`);
+
+    } catch(err) {
+      clearInterval(progInt);
+      document.getElementById('videoSpinner').style.display = 'none';
+      document.getElementById('analyzeBtn').style.display = 'inline-block';
+      setStatus('Erreur : ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(currentVideo);
+}
+
+function showDetPopup(label, sub) {
+  const popup = document.getElementById('detPopup');
+  document.getElementById('detPopupLabel').textContent = label;
+  document.getElementById('detPopupSub').textContent = sub;
+  popup.classList.add('visible');
+  if (popupTimeout) clearTimeout(popupTimeout);
+  popupTimeout = setTimeout(() => popup.classList.remove('visible'), 2500);
+}
+
+// ── DRAG & DROP ───────────────────────────────────────────────────────────────
+function dragOver(e) { e.preventDefault(); }
+function drop(e) {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    currentFile = file;
+    show('imgLeft', 'phLeft', URL.createObjectURL(file));
+    hideBanner('image'); setStatus('Image chargée : ' + file.name);
+  }
+}
+function videoDragOver(e) { e.preventDefault(); document.getElementById('videoZone').classList.add('drag-over'); }
+function videoDragLeave(e) { document.getElementById('videoZone').classList.remove('drag-over'); }
+function videoDrop(e) {
+  e.preventDefault(); videoDragLeave(e);
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('video/')) {
+    currentVideo = file;
+    loadVideo({files: [file]});
+  }
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function show(imgId, phId, src) {
+  const img = document.getElementById(imgId);
+  img.src = src; img.style.display = 'block';
+  document.getElementById(phId).style.display = 'none';
+}
+function hide(id) { document.getElementById(id).style.display = 'none'; }
+function showEl(id) { document.getElementById(id).style.display = 'flex'; }
+function hideEl(id) { document.getElementById(id).style.display = 'none'; }
+
+function showBanner(tab, msg) {
+  const b = document.getElementById(tab + 'Banner');
+  document.getElementById(tab + 'BannerText').textContent = msg;
+  b.classList.add('visible');
+}
+function hideBanner(tab) {
+  document.getElementById(tab + 'Banner').classList.remove('visible');
+}
+
+function setStatus(msg) { document.getElementById('statusText').textContent = msg; }
+
+function updateZoom(val) {
+  zoom = val / 100;
+  document.getElementById('zoomLabel').textContent = 'Zoom : ' + val + '%';
+  document.querySelectorAll('.card-img').forEach(img => { img.style.maxWidth = val + '%'; });
+}
+
+function formatLabel(raw) {
+  if (!raw) return 'Inconnu';
+  const l = raw.toLowerCase().trim();
+  if (l.startsWith('speed_')) return 'Vitesse : ' + l.replace('speed_','').replace(/[^0-9]/g,'') + ' km/h';
+  return {
+    'stop':'STOP', 'give_way':'Cédez le passage', 'yield':'Cédez le passage',
+    'no_entry':'Sens interdit', 'no_parking':'Stationnement interdit',
+    'pedestrian':'Passage piéton', 'roundabout':'Rond-point'
+  }[l] || raw.replace(/_/g,' ').replace(/^\w/,c=>c.toUpperCase());
+}
+</script>
+</body>
+</html>

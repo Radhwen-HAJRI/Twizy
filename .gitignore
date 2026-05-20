@@ -1,16 +1,16 @@
-@"
-# Modeles YOLO (trop lourds)
-*.pt
-*.pth
-runs/
+# Fichiers de modèle volumineux
+Detection_panneaux-11/my_model.keras
+*.keras
 
-# Dataset
-data/raw/
-data/processed/
-*.zip
-
-# Python
+# Fichiers Python
 __pycache__/
-*.pyc
-.env
-"@ | Out-File -Encoding utf8 .gitignore
+*.py[cod]
+*$py.class
+
+# Fichiers de configuration
+.vscode/
+.idea/
+
+# Fichiers temporaires
+*.tmp
+*.temp 

@@ -1,0 +1,566 @@
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
+import javax.swing.border.*;
+import java.io.*;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.URI;
+import java.util.Base64;
+import org.json.JSONObject;
+import java.awt.BasicStroke;
+import java.util.List;
+import java.awt.Rectangle;
+
+public class Interface_image extends JFrame {
+
+    // ── Palette ───────────────────────────────────────────────────────────────
+    private static final Color PRIMARY_COLOR  = new Color(25,  118, 210);   // Modern blue
+    private static final Color ACCENT_COLOR   = new Color(76,  175,  80);   // Modern green
+    private static final Color DANGER_COLOR   = new Color(229,  57,  53);   // Modern red
+    private static final Color BG_COLOR       = new Color(248, 249, 250);   // Subtle white
+    private static final Color SIDEBAR_COLOR  = new Color(33,   47,  61);   // Dark blue-gray
+    private static final Color SIDEBAR_HOVER  = new Color(48,   63,  82);   // Lighter hover
+    private static final Color TEXT_LIGHT     = new Color(225, 229, 235);   // Light text
+    private static final Color TEXT_DARK      = new Color(33,   47,  61);   // Dark text
+    private static final Color CARD_BG        = Color.WHITE;               // Pure white
+    private static final Color BORDER_COLOR   = new Color(224, 224, 224);   // Modern border
+
+    // ── Chemin VLC ────────────────────────────────────────────────────────────
+    private static final String VLC_PATH = "C:\\Program Files\\VideoLAN\\VLC";
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    private double  imageScaleFactor     = 0.5;
+    private double  detectionScaleFactor = 0.7;
+    private boolean autoDetect           = false;
+    private BufferedImage originalImage  = null;
+
+    // ── UI ────────────────────────────────────────────────────────────────────
+    private JLabel imageLabel;
+    private JLabel imageLabel2;
+    private JLabel resultBanner;
+    private JLabel statusLabel;
+    private JPanel imagesPanel;
+
+    // ══════════════════════════════════════════════════════════════════════════
+    public Interface_image() {
+        super("Reconnaissance de Panneaux Routiers");
+        setupFrame();
+        buildUI();
+        setVisible(true);
+    }
+
+    private void setupFrame() {
+        setSize(1400, 850);
+        setMinimumSize(new Dimension(1000, 700));
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+        getContentPane().setBackground(BG_COLOR);
+        setTitle("Road Sign Detection System");
+    }
+
+    private void buildUI() {
+        add(buildTopToolbar(), BorderLayout.NORTH);
+        add(buildContent(),    BorderLayout.CENTER);
+        add(buildStatusBar(),  BorderLayout.SOUTH);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  TOP TOOLBAR WITH GRID BUTTONS
+    // ══════════════════════════════════════════════════════════════════════════
+    private JPanel buildTopToolbar() {
+        JPanel toolbar = new JPanel(new BorderLayout());
+        toolbar.setBackground(SIDEBAR_COLOR);
+        toolbar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(15, 35, 70)));
+        
+        // Title section
+        JPanel titleSection = new JPanel(new FlowLayout(FlowLayout.LEFT, 16, 12));
+        titleSection.setBackground(SIDEBAR_COLOR);
+        JLabel appTitle = new JLabel("🛣️  Reconnaissance de Panneaux Routiers");
+        appTitle.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        appTitle.setForeground(Color.WHITE);
+        titleSection.add(appTitle);
+        
+        // Button grid (3 columns x 2 rows)
+        JPanel buttonGrid = new JPanel(new GridLayout(2, 3, 10, 8));
+        buttonGrid.setBackground(SIDEBAR_COLOR);
+        buttonGrid.setBorder(BorderFactory.createEmptyBorder(10, 16, 10, 16));
+        
+        // Row 1: Image operations
+        buttonGrid.add(toolbarBtn("📁 Choisir image",  ACCENT_COLOR, e -> choix_image()));
+        buttonGrid.add(toolbarBtn("🔍 Détecter",       PRIMARY_COLOR, e -> detecter_panneau()));
+        buttonGrid.add(toolbarBtn("🗑️  Effacer",       DANGER_COLOR, e -> clearImages()));
+        
+        // Row 2: Video and options
+        buttonGrid.add(toolbarBtn("🎬 Vidéo",          PRIMARY_COLOR, e -> openVideoDetection()));
+        buttonGrid.add(toolbarBtn("⚙️  Options",       new Color(100, 120, 160), e -> showOptionsDialog()));
+        buttonGrid.add(new JPanel()); // Empty cell
+        
+        JPanel bottomSection = new JPanel(new BorderLayout());
+        bottomSection.setBackground(SIDEBAR_COLOR);
+        bottomSection.add(buttonGrid, BorderLayout.CENTER);
+        
+        toolbar.add(titleSection, BorderLayout.NORTH);
+        toolbar.add(bottomSection, BorderLayout.CENTER);
+        return toolbar;
+    }
+    
+    private JButton toolbarBtn(String text, Color color, ActionListener action) {
+        JButton btn = new JButton(text);
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        btn.setForeground(Color.WHITE);
+        btn.setBackground(color);
+        btn.setBorderPainted(false);
+        btn.setFocusPainted(false);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent e) {
+                btn.setBackground(brighten(color, 30));
+            }
+            public void mouseExited(MouseEvent e) {
+                btn.setBackground(color);
+            }
+        });
+        btn.addActionListener(action);
+        return btn;
+    }
+    
+    private Color brighten(Color c, int amount) {
+        return new Color(
+            Math.min(c.getRed() + amount, 255),
+            Math.min(c.getGreen() + amount, 255),
+            Math.min(c.getBlue() + amount, 255)
+        );
+    }
+    
+    private void showOptionsDialog() {
+        JDialog dialog = new JDialog(this, "Options", true);
+        dialog.setSize(400, 280);
+        dialog.setLocationRelativeTo(this);
+        JPanel p = new JPanel(new BoxLayout(new JPanel(), BoxLayout.Y_AXIS));
+        p.setBackground(BG_COLOR);
+        p.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        p.add(sliderOption("Échelle image", 25, 100, (int)(imageScaleFactor * 100),
+            val -> { imageScaleFactor = val / 100.0; if (originalImage != null) refreshMainImage(); }));
+        p.add(Box.createVerticalStrut(12));
+        p.add(sliderOption("Échelle détection", 25, 100, (int)(detectionScaleFactor * 100),
+            val -> { detectionScaleFactor = val / 100.0; refreshDetectionImage(); }));
+        p.add(Box.createVerticalStrut(16));
+        p.add(checkOption("Détection auto", autoDetect, v -> autoDetect = v));
+        dialog.add(new JScrollPane(p));
+        dialog.setVisible(true);
+    }
+
+
+
+
+
+    private JPanel sliderOption(String label, int min, int max, int init,
+                                java.util.function.IntConsumer onChange) {
+        JPanel p = new JPanel();
+        p.setBackground(BG_COLOR);
+        p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+        p.setMaximumSize(new Dimension(350, 60));
+        JLabel lbl = new JLabel(label + " : " + init + "%");
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        lbl.setForeground(TEXT_DARK);
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JSlider slider = new JSlider(min, max, init);
+        slider.setBackground(BG_COLOR);
+        slider.setMaximumSize(new Dimension(350, 28));
+        slider.setAlignmentX(Component.LEFT_ALIGNMENT);
+        slider.addChangeListener(e -> {
+            lbl.setText(label + " : " + slider.getValue() + "%");
+            if (!slider.getValueIsAdjusting()) onChange.accept(slider.getValue());
+        });
+        p.add(lbl); p.add(slider);
+        return p;
+    }
+
+    private JPanel checkOption(String label, boolean init,
+                               java.util.function.Consumer<Boolean> onChange) {
+        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        p.setBackground(BG_COLOR);
+        p.setMaximumSize(new Dimension(350, 30));
+        JCheckBox cb = new JCheckBox(label, init);
+        cb.setBackground(BG_COLOR);
+        cb.setForeground(TEXT_DARK);
+        cb.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        cb.setFocusPainted(false);
+        cb.addActionListener(e -> onChange.accept(cb.isSelected()));
+        p.add(cb);
+        return p;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  CONTENT
+    // ══════════════════════════════════════════════════════════════════════════
+    private JPanel buildContent() {
+        JPanel content = new JPanel(new BorderLayout());
+        content.setBackground(BG_COLOR);
+
+        // Header removed - moved to top toolbar
+
+        // Centre
+        JPanel centre = new JPanel(new BorderLayout(0, 0));
+        centre.setBackground(BG_COLOR);
+
+        // Bandeau résultat
+        resultBanner = new JLabel("", SwingConstants.CENTER);
+        resultBanner.setFont(new Font("Arial", Font.BOLD, 16));
+        resultBanner.setOpaque(true);
+        resultBanner.setBackground(ACCENT_COLOR);
+        resultBanner.setForeground(Color.WHITE);
+        resultBanner.setPreferredSize(new Dimension(0, 0));
+        centre.add(resultBanner, BorderLayout.NORTH);
+
+        // Deux cartes côte à côte
+        imagesPanel = new JPanel(new GridLayout(1, 2, 16, 0));
+        imagesPanel.setBackground(BG_COLOR);
+        imagesPanel.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
+
+        // Carte gauche : image originale
+        JPanel cardOrig = new JPanel(new BorderLayout());
+        cardOrig.setBackground(CARD_BG);
+        cardOrig.setBorder(BorderFactory.createLineBorder(PRIMARY_COLOR, 2));
+        JPanel origHeader = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10));
+        origHeader.setBackground(PRIMARY_COLOR);
+        JLabel origTitle = new JLabel("■  Image originale");
+        origTitle.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        origTitle.setForeground(Color.WHITE);
+        origHeader.add(origTitle);
+        cardOrig.add(origHeader, BorderLayout.NORTH);
+        imageLabel = new JLabel("Aucune image", SwingConstants.CENTER);
+        imageLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        imageLabel.setForeground(new Color(190, 195, 205));
+        cardOrig.add(imageLabel, BorderLayout.CENTER);
+
+        // Carte droite : image détectée
+        JPanel cardDet = new JPanel(new BorderLayout());
+        cardDet.setBackground(CARD_BG);
+        cardDet.setBorder(BorderFactory.createLineBorder(ACCENT_COLOR, 2));
+        JPanel detHeader = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10));
+        detHeader.setBackground(ACCENT_COLOR);
+        JLabel detTitle = new JLabel("●  Résultat de la détection");
+        detTitle.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        detTitle.setForeground(Color.WHITE);
+        detHeader.add(detTitle);
+        cardDet.add(detHeader, BorderLayout.NORTH);
+        imageLabel2 = new JLabel("En attente de détection", SwingConstants.CENTER);
+        imageLabel2.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        imageLabel2.setForeground(new Color(190, 195, 205));
+        cardDet.add(imageLabel2, BorderLayout.CENTER);
+
+        imagesPanel.add(cardOrig);
+        imagesPanel.add(cardDet);
+
+        JScrollPane scroll = new JScrollPane(imagesPanel,
+            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+            JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scroll.setBorder(null);
+        scroll.getViewport().setBackground(BG_COLOR);
+        centre.add(scroll, BorderLayout.CENTER);
+
+        content.add(centre, BorderLayout.CENTER);
+        return content;
+    }
+
+    // ── Status bar ────────────────────────────────────────────────────────────
+    private JPanel buildStatusBar() {
+        JPanel bar = new JPanel(new BorderLayout());
+        bar.setBackground(new Color(240, 242, 245));
+        bar.setPreferredSize(new Dimension(0, 28));
+        bar.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER_COLOR),
+            BorderFactory.createEmptyBorder(0, 16, 0, 16)));
+        statusLabel = new JLabel("Prêt.");
+        statusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        statusLabel.setForeground(new Color(110, 125, 150));
+        bar.add(statusLabel, BorderLayout.WEST);
+        return bar;
+    }
+
+    private void setStatus(String msg) {
+        SwingUtilities.invokeLater(() -> statusLabel.setText(msg));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  BANDEAU RÉSULTAT
+    // ══════════════════════════════════════════════════════════════════════════
+    private void showBanner(String detectedClass) {
+        String display = formatLabel(detectedClass);
+        resultBanner.setText("✓   Panneau détecté : " + display);
+        resultBanner.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        resultBanner.setBackground(new Color(33, 150, 243));
+        resultBanner.setForeground(Color.WHITE);
+        resultBanner.setPreferredSize(new Dimension(0, 48));
+        resultBanner.setBorder(BorderFactory.createEmptyBorder(0, 24, 0, 24));
+        resultBanner.getParent().revalidate();
+        resultBanner.getParent().repaint();
+    }
+
+    private void hideBanner() {
+        resultBanner.setText("");
+        resultBanner.setPreferredSize(new Dimension(0, 0));
+        resultBanner.setBorder(null);
+        if (resultBanner.getParent() != null) {
+            resultBanner.getParent().revalidate();
+            resultBanner.getParent().repaint();
+        }
+    }
+
+    private String formatLabel(String raw) {
+        if (raw == null) return "Inconnu";
+        String lower = raw.toLowerCase().trim();
+        if (lower.startsWith("speed_")) {
+            String num = lower.replace("speed_", "").replaceAll("[^0-9]", "");
+            return "Vitesse limite : " + num + " km/h";
+        }
+        switch (lower) {
+            case "stop":       return "STOP";
+            case "give_way":
+            case "yield":      return "Cédez le passage";
+            case "no_entry":   return "Sens interdit";
+            case "no_parking": return "Interdiction de stationner";
+            case "pedestrian": return "Passage piéton";
+            case "roundabout": return "Rond-point obligatoire";
+            default:
+                String s = raw.replace("_", " ");
+                return s.substring(0, 1).toUpperCase() + s.substring(1);
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  HELPERS
+    // ══════════════════════════════════════════════════════════════════════════
+    private void refreshMainImage() {
+        if (originalImage == null) return;
+        int w = (int)(originalImage.getWidth()  * imageScaleFactor);
+        int h = (int)(originalImage.getHeight() * imageScaleFactor);
+        imageLabel.setIcon(new ImageIcon(
+            originalImage.getScaledInstance(w, h, Image.SCALE_SMOOTH)));
+        imageLabel.setText(null);
+    }
+
+    private void refreshDetectionImage() {
+        if (imageLabel2.getIcon() == null || originalImage == null) return;
+        int w = (int)(originalImage.getWidth()  * imageScaleFactor);
+        int h = (int)(originalImage.getHeight() * imageScaleFactor);
+        Image src = ((ImageIcon) imageLabel2.getIcon()).getImage();
+        imageLabel2.setIcon(new ImageIcon(
+            src.getScaledInstance(w, h, Image.SCALE_SMOOTH)));
+    }
+
+    private void clearImages() {
+        originalImage = null;
+        imageLabel.setIcon(null);
+        imageLabel.setText("Aucune image");
+        imageLabel2.setIcon(null);
+        imageLabel2.setText("En attente de détection");
+        hideBanner();
+        imagesPanel.revalidate();
+        imagesPanel.repaint();
+        setStatus("Images effacées.");
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  VIDÉO — AVEC FIX CHEMIN VLC
+    // ══════════════════════════════════════════════════════════════════════════
+    private void forceVlcPath() {
+        // Étape 1 : propriétés système JNA/vlcj
+        System.setProperty("jna.library.path",  VLC_PATH);
+        System.setProperty("vlcj.library.path", VLC_PATH);
+        System.out.println("[VLC] Chemin forcé : " + VLC_PATH);
+
+        // Étape 2 : injection dans usr_paths du ClassLoader
+        try {
+            java.lang.reflect.Field field =
+                ClassLoader.class.getDeclaredField("usr_paths");
+            field.setAccessible(true);
+            String[] paths = (String[]) field.get(null);
+            boolean alreadyIn = false;
+            for (String p : paths) {
+                if (p.equals(VLC_PATH)) { alreadyIn = true; break; }
+            }
+            if (!alreadyIn) {
+                String[] newPaths = new String[paths.length + 1];
+                System.arraycopy(paths, 0, newPaths, 0, paths.length);
+                newPaths[paths.length] = VLC_PATH;
+                field.set(null, newPaths);
+                System.out.println("[VLC] usr_paths mis à jour.");
+            }
+        } catch (Exception e) {
+            System.err.println("[VLC] Réflexion ignorée : " + e.getMessage());
+        }
+
+        // Étape 3 : vérifier que libvlc.dll existe
+        File libvlc = new File(VLC_PATH, "libvlc.dll");
+        if (!libvlc.exists()) {
+            System.err.println("[VLC] ⚠ libvlc.dll introuvable dans " + VLC_PATH);
+        } else {
+            System.out.println("[VLC] libvlc.dll trouvé ✓ (" + libvlc.length() + " octets)");
+        }
+    }
+
+    private void openVideoDetection() {
+        // Forcer le chemin VLC AVANT d'instancier VideoDetectionWindow
+        forceVlcPath();
+
+        try {
+            VideoDetectionWindow win = new VideoDetectionWindow();
+            win.setLocationRelativeTo(this);
+            win.setVisible(true);
+            setStatus("Fenêtre de détection vidéo ouverte.");
+
+        } catch (UnsatisfiedLinkError | NoClassDefFoundError err) {
+            System.err.println("[VLC] Erreur native : " + err.getMessage());
+            err.printStackTrace();
+            JOptionPane.showMessageDialog(this,
+                "<html><b>Impossible de charger VLC.</b><br><br>"
+                + "Chemin utilisé : <b>" + VLC_PATH + "</b><br>"
+                + "Vérifiez que libvlc.dll existe à cet emplacement.<br><br>"
+                + "<i>Erreur : " + err.getMessage() + "</i><br><br>"
+                + "Consultez la console Java pour plus de détails.</html>",
+                "VLC requis", JOptionPane.ERROR_MESSAGE);
+
+        } catch (Exception ex) {
+            System.err.println("[VLC] Exception : " + ex.getMessage());
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this,
+                "Erreur inattendue : " + ex.getMessage(),
+                "Erreur", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  DÉTECTION IMAGE
+    // ══════════════════════════════════════════════════════════════════════════
+    private void choix_image() {
+        JFileChooser fc = new JFileChooser();
+        fc.setFileFilter(new javax.swing.filechooser.FileFilter() {
+            public boolean accept(File f) {
+                if (f.isDirectory()) return true;
+                String n = f.getName().toLowerCase();
+                return n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".png");
+            }
+            public String getDescription() { return "Images (*.jpg, *.jpeg, *.png)"; }
+        });
+        if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            File fichier = fc.getSelectedFile();
+            try {
+                originalImage = ImageIO.read(fichier);
+                int w = (int)(originalImage.getWidth()  * imageScaleFactor);
+                int h = (int)(originalImage.getHeight() * imageScaleFactor);
+                imageLabel.setIcon(new ImageIcon(
+                    originalImage.getScaledInstance(w, h, Image.SCALE_SMOOTH)));
+                imageLabel.setText(null);
+                imageLabel2.setIcon(null);
+                imageLabel2.setText("En attente de détection");
+                hideBanner();
+                imagesPanel.revalidate();
+                setStatus("Image chargée : " + fichier.getName());
+                if (autoDetect) detecter_panneau();
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(this, "Erreur de lecture de l'image.",
+                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private void detecter_panneau() {
+        if (imageLabel.getIcon() == null) {
+            JOptionPane.showMessageDialog(this,
+                "Veuillez d'abord sélectionner une image.",
+                "Information", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        setStatus("Détection en cours…");
+
+        new Thread(() -> {
+            try {
+                File tempFile = File.createTempFile("temp_image", ".jpg");
+                ImageIO.write(originalImage, "jpg", tempFile);
+
+                HttpClient client = HttpClient.newHttpClient();
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost:5000/predict"))
+                    .header("Content-Type", "image/jpeg")
+                    .POST(HttpRequest.BodyPublishers.ofFile(tempFile.toPath()))
+                    .build();
+
+                HttpResponse<String> response = client.send(request,
+                    HttpResponse.BodyHandlers.ofString());
+
+                if (response.statusCode() == 200) {
+                    JSONObject json = new JSONObject(response.body());
+                    String detectedClass = json.getString("class");
+                    String base64Image   = json.getString("image");
+
+                    byte[] imageBytes = Base64.getDecoder().decode(base64Image);
+                    ByteArrayInputStream bis = new ByteArrayInputStream(imageBytes);
+                    BufferedImage detectedImage = ImageIO.read(bis);
+
+                    // Rectangle vert sur l'image détectée
+                    Graphics2D g2d = detectedImage.createGraphics();
+                    g2d.setColor(new Color(39, 174, 96));
+                    g2d.setStroke(new BasicStroke(4));
+                    int pad = 8;
+                    g2d.drawRect(pad, pad,
+                        detectedImage.getWidth()  - 2 * pad,
+                        detectedImage.getHeight() - 2 * pad);
+                    g2d.dispose();
+
+                    int w = (int)(detectedImage.getWidth()  * detectionScaleFactor);
+                    int h = (int)(detectedImage.getHeight() * detectionScaleFactor);
+                    Image imgReduite = detectedImage.getScaledInstance(w, h, Image.SCALE_SMOOTH);
+
+                    final String cls = detectedClass;
+                    SwingUtilities.invokeLater(() -> {
+                        imageLabel2.setIcon(new ImageIcon(imgReduite));
+                        imageLabel2.setText(null);
+                        showBanner(cls);
+                        imagesPanel.revalidate();
+                        imagesPanel.repaint();
+                        setStatus("Panneau détecté : " + formatLabel(cls));
+                    });
+                } else {
+                    throw new IOException("HTTP " + response.statusCode());
+                }
+                tempFile.delete();
+
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() -> {
+                    setStatus("Erreur : " + ex.getMessage());
+                    JOptionPane.showMessageDialog(Interface_image.this,
+                        "Erreur lors de la détection :\n" + ex.getMessage(),
+                        "Erreur", JOptionPane.ERROR_MESSAGE);
+                });
+            }
+        }).start();
+    }
+
+    @SuppressWarnings("unused")
+    private void drawDetectionRectangles(BufferedImage image, List<Rectangle> detections) {
+        Graphics2D g2d = image.createGraphics();
+        g2d.setColor(Color.GREEN);
+        g2d.setStroke(new BasicStroke(3));
+        for (Rectangle r : detections) g2d.drawRect(r.x, r.y, r.width, r.height);
+        g2d.dispose();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    public static void main(String[] args) {
+        // Diagnostic rapide VLC au démarrage
+        File libvlc = new File("C:\\Program Files\\VideoLAN\\VLC\\libvlc.dll");
+        System.out.println("[Démarrage] libvlc.dll trouvé : " + libvlc.exists()
+            + " (" + libvlc.length() + " octets)");
+
+        try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
+        catch (Exception ignored) {}
+        SwingUtilities.invokeLater(Interface_image::new);
+    }
+}
