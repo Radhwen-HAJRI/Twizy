@@ -10,8 +10,11 @@ from PIL import Image, ImageDraw, ImageFont
 
 # TensorFlow optionnel
 try:
-    import keras
-    tf_model = keras.models.load_model("Detection_panneaux/my_model.keras")
+    import tensorflow as tf
+    tf_model = tf.keras.models.load_model(
+        "Detection_panneaux/my_model.keras",
+        compile=False
+    )                                
     print("✓ TensorFlow model loaded")
     TF_OK = True
 except Exception as e:

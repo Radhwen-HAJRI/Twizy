@@ -12,7 +12,6 @@ import java.awt.image.BufferedImage;
 
 public class SimpleGui {
 
-    // ── Palette ───────────────────────────────────────────────────────────────
     private static final Color BG           = new Color(10,  13,  20);
     private static final Color PANEL        = new Color(16,  20,  30);
     private static final Color CARD         = new Color(20,  26,  40);
@@ -21,21 +20,22 @@ public class SimpleGui {
     private static final Color GREEN        = new Color(35, 197, 112);
     private static final Color RED          = new Color(248, 81,  73);
     private static final Color PURPLE       = new Color(163,113, 247);
+    private static final Color ORANGE       = new Color(240,150,  50);
     private static final Color TEXT         = new Color(220,227, 235);
     private static final Color TEXT_MUTED   = new Color(100,110, 130);
     private static final Color BORDER       = new Color(35,  42,  60);
     private static final Color BORDER_LIGHT = new Color(55,  65,  90);
 
-    // ── State ─────────────────────────────────────────────────────────────────
-    private static String imagePath = null;
-    private static JLabel imgLeft;
-    private static JLabel imgRight;
-    private static JLabel statusLbl;
-    private static JLabel bannerLbl;
-    private static JPanel cardsPanel;
-    private static double zoom = 0.6;
+    private static String   imagePath  = null;
+    private static String   modelType  = "yolov8"; // "yolov8" ou "tensorflow"
+    private static JLabel   imgLeft;
+    private static JLabel   imgRight;
+    private static JLabel   statusLbl;
+    private static JLabel   bannerLbl;
+    private static JPanel   cardsPanel;
+    private static double   zoom       = 0.6;
+    private static JFrame   mainFrame;
 
-    // ══════════════════════════════════════════════════════════════════════════
     public static void main(String[] args) {
         try { com.formdev.flatlaf.FlatDarkLaf.setup(); }
         catch (Exception ignored) {}
@@ -44,22 +44,20 @@ public class SimpleGui {
     }
 
     private static void launch() {
-        JFrame f = new JFrame("Twizzy — Détection de Panneaux");
-        f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        f.setSize(1440, 880);
-        f.setMinimumSize(new Dimension(1100, 700));
-        f.setLocationRelativeTo(null);
-        f.setBackground(BG);
-        f.setLayout(new BorderLayout());
-        f.add(sidebar(f),  BorderLayout.WEST);
-        f.add(content(),   BorderLayout.CENTER);
-        f.add(statusBar(), BorderLayout.SOUTH);
-        f.setVisible(true);
+        mainFrame = new JFrame("Twizzy — Détection de Panneaux");
+        mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        mainFrame.setSize(1440, 880);
+        mainFrame.setMinimumSize(new Dimension(1100, 700));
+        mainFrame.setLocationRelativeTo(null);
+        mainFrame.setBackground(BG);
+        mainFrame.setLayout(new BorderLayout());
+        mainFrame.add(sidebar(mainFrame), BorderLayout.WEST);
+        mainFrame.add(content(),          BorderLayout.CENTER);
+        mainFrame.add(statusBar(),        BorderLayout.SOUTH);
+        mainFrame.setVisible(true);
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  SIDEBAR
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── SIDEBAR ───────────────────────────────────────────────────────────────
     private static JPanel sidebar(JFrame frame) {
         JPanel sb = new JPanel();
         sb.setLayout(new BoxLayout(sb, BoxLayout.Y_AXIS));
@@ -67,13 +65,11 @@ public class SimpleGui {
         sb.setPreferredSize(new Dimension(230, 0));
         sb.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, BORDER));
 
-        // ── Logo
+        // Logo
         sb.add(Box.createVerticalStrut(22));
         JPanel logoRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 0));
         logoRow.setBackground(SIDEBAR);
         logoRow.setMaximumSize(new Dimension(230, 52));
-
-        // Icône logo rond coloré
         JPanel iconCircle = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D)g.create();
@@ -93,7 +89,6 @@ public class SimpleGui {
             @Override public Dimension getPreferredSize() { return new Dimension(36, 36); }
         };
         iconCircle.setOpaque(false);
-
         JPanel textCol = new JPanel();
         textCol.setLayout(new BoxLayout(textCol, BoxLayout.Y_AXIS));
         textCol.setBackground(SIDEBAR);
@@ -104,41 +99,61 @@ public class SimpleGui {
         t2.setFont(new Font("Segoe UI", Font.PLAIN, 10));
         t2.setForeground(TEXT_MUTED);
         textCol.add(t1); textCol.add(t2);
-
-        logoRow.add(iconCircle);
-        logoRow.add(textCol);
+        logoRow.add(iconCircle); logoRow.add(textCol);
         sb.add(logoRow);
         sb.add(Box.createVerticalStrut(20));
         sb.add(divider());
         sb.add(Box.createVerticalStrut(16));
 
-        // ── Actions
+        // Actions
         sb.add(sectionTitle("ACTIONS"));
         sb.add(Box.createVerticalStrut(6));
-
-        sb.add(iconBtn("Choisir une image", BLUE,
-            drawFolderIcon(BLUE), e -> {
-                JFileChooser fc = new JFileChooser();
-                fc.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
-                    "Images", "jpg","jpeg","png"));
-                if (fc.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
-                    imagePath = fc.getSelectedFile().getAbsolutePath();
-                    loadLeft(imagePath);
-                    status("Image : " + fc.getSelectedFile().getName());
-                }
-            }));
+        sb.add(iconBtn("Choisir une image", BLUE, drawFolderIcon(BLUE), e -> {
+            JFileChooser fc = new JFileChooser();
+            fc.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Images", "jpg","jpeg","png"));
+            if (fc.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
+                imagePath = fc.getSelectedFile().getAbsolutePath();
+                loadLeft(imagePath);
+                status("Image : " + fc.getSelectedFile().getName());
+            }
+        }));
         sb.add(Box.createVerticalStrut(2));
-        sb.add(iconBtn("Détecter le panneau", GREEN,
-            drawSearchIcon(GREEN), e -> detect()));
+        sb.add(iconBtn("Détecter le panneau", GREEN, drawSearchIcon(GREEN), e -> detect()));
         sb.add(Box.createVerticalStrut(2));
-        sb.add(iconBtn("Effacer", RED,
-            drawTrashIcon(RED), e -> clear()));
+        sb.add(iconBtn("Ouvrir vidéo", PURPLE, drawVideoIcon(PURPLE), e -> openVideo()));
+        sb.add(Box.createVerticalStrut(2));
+        sb.add(iconBtn("Effacer", RED, drawTrashIcon(RED), e -> clear()));
 
         sb.add(Box.createVerticalStrut(20));
         sb.add(divider());
         sb.add(Box.createVerticalStrut(14));
 
-        // ── Options
+        // Modèle
+        sb.add(sectionTitle("MODÈLE"));
+        sb.add(Box.createVerticalStrut(8));
+        JPanel modelPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 18, 0));
+        modelPanel.setBackground(SIDEBAR);
+        modelPanel.setMaximumSize(new Dimension(230, 32));
+        String[] models = {"YOLOv8", "TensorFlow (CNN)"};
+        JComboBox<String> modelBox = new JComboBox<>(models);
+        modelBox.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        modelBox.setBackground(new Color(25, 30, 45));
+        modelBox.setForeground(TEXT);
+        modelBox.setMaximumSize(new Dimension(190, 28));
+        modelBox.addActionListener(e -> {
+            modelType = modelBox.getSelectedIndex() == 0 ? "yolov8" : "tensorflow";
+            status("Modèle : " + (modelBox.getSelectedIndex() == 0 ? "YOLOv8" : "TensorFlow CNN"));
+            // Mettre à jour le badge
+            updateBadge(modelBox.getSelectedIndex() == 0 ? "YOLOv8" : "CNN");
+        });
+        modelPanel.add(modelBox);
+        sb.add(modelPanel);
+
+        sb.add(Box.createVerticalStrut(16));
+        sb.add(divider());
+        sb.add(Box.createVerticalStrut(14));
+
+        // Options
         sb.add(sectionTitle("OPTIONS"));
         sb.add(Box.createVerticalStrut(10));
         sb.add(sliderRow("Zoom", 20, 100, 60, v -> {
@@ -149,7 +164,6 @@ public class SimpleGui {
         sb.add(Box.createVerticalGlue());
         sb.add(divider());
 
-        // ── Footer avec pastille verte
         JPanel foot = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10));
         foot.setBackground(SIDEBAR);
         foot.setMaximumSize(new Dimension(230, 38));
@@ -163,142 +177,53 @@ public class SimpleGui {
         return sb;
     }
 
-    // ── Icônes dessinées en SVG-like ─────────────────────────────────────────
-    private static JPanel drawFolderIcon(Color c) {
-        return new JPanel() {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D)g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(c);
-                g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                // Dossier
-                g2.drawRoundRect(1, 5, 14, 10, 2, 2);
-                g2.drawLine(1, 8, 6, 8);
-                g2.drawLine(6, 8, 8, 5);
-                g2.drawLine(8, 5, 15, 5);
-                g2.dispose();
-            }
-            @Override public Dimension getPreferredSize() { return new Dimension(18, 18); }
-            { setOpaque(false); }
-        };
+    // ── Badge (mise à jour dynamique) ─────────────────────────────────────────
+    private static JLabel badgeLabel;
+
+    private static void updateBadge(String text) {
+        if (badgeLabel != null) {
+            badgeLabel.setText("  ● " + text + "  ");
+            badgeLabel.setForeground(text.equals("YOLOv8") ? GREEN : ORANGE);
+            badgeLabel.repaint();
+        }
     }
 
-    private static JPanel drawSearchIcon(Color c) {
-        return new JPanel() {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D)g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(c);
-                g2.setStroke(new BasicStroke(1.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                g2.drawOval(2, 2, 10, 10);
-                g2.drawLine(10, 10, 15, 15);
-                g2.dispose();
-            }
-            @Override public Dimension getPreferredSize() { return new Dimension(18, 18); }
-            { setOpaque(false); }
-        };
-    }
-
-    private static JPanel drawTrashIcon(Color c) {
-        return new JPanel() {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D)g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(c);
-                g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                g2.drawRoundRect(3, 5, 10, 10, 2, 2);
-                g2.drawLine(1, 5, 15, 5);
-                g2.drawLine(6, 5, 6, 3);
-                g2.drawLine(10, 5, 10, 3);
-                g2.drawLine(6, 3, 10, 3);
-                g2.drawLine(6, 8, 6, 12);
-                g2.drawLine(10, 8, 10, 12);
-                g2.dispose();
-            }
-            @Override public Dimension getPreferredSize() { return new Dimension(18, 18); }
-            { setOpaque(false); }
-        };
-    }
-
-    private static JButton iconBtn(String text, Color accent, JPanel icon, ActionListener action) {
-        JButton b = new JButton() {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D)g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                if (getModel().isRollover()) {
-                    g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 22));
-                    g2.fillRoundRect(4, 2, getWidth()-8, getHeight()-4, 8, 8);
-                    g2.setColor(accent);
-                    g2.fillRoundRect(2, (getHeight()-20)/2, 3, 20, 3, 3);
-                }
-                if (getModel().isPressed()) {
-                    g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 40));
-                    g2.fillRoundRect(4, 2, getWidth()-8, getHeight()-4, 8, 8);
-                }
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        };
-        b.setLayout(new FlowLayout(FlowLayout.LEFT, 14, 0));
-        b.add(icon);
-        JLabel lbl = new JLabel(text);
-        lbl.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        lbl.setForeground(TEXT);
-        b.add(lbl);
-        b.setOpaque(false);
-        b.setContentAreaFilled(false);
-        b.setBorderPainted(false);
-        b.setFocusPainted(false);
-        b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        b.setMaximumSize(new Dimension(230, 42));
-        b.setPreferredSize(new Dimension(230, 42));
-        b.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 0));
-        b.addActionListener(action);
-        return b;
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  CONTENT
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── CONTENT ───────────────────────────────────────────────────────────────
     private static JPanel content() {
         JPanel root = new JPanel(new BorderLayout());
         root.setBackground(BG);
 
-        // ── Top bar
         JPanel topBar = new JPanel(new BorderLayout());
         topBar.setBackground(PANEL);
         topBar.setPreferredSize(new Dimension(0, 52));
         topBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER));
-
         JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 16, 14));
         titleRow.setBackground(PANEL);
-        JLabel title = lbl("Analyse d'images", 14, Font.BOLD, TEXT);
-        titleRow.add(title);
+        titleRow.add(lbl("Analyse d'images", 14, Font.BOLD, TEXT));
         topBar.add(titleRow, BorderLayout.WEST);
 
-        // Badge YOLOv8
-        JLabel badge = new JLabel("  ● YOLOv8  ") {
+        badgeLabel = new JLabel("  ● YOLOv8  ") {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D)g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(35, 197, 112, 25));
+                Color fg = getForeground();
+                g2.setColor(new Color(fg.getRed(), fg.getGreen(), fg.getBlue(), 25));
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
-                g2.setColor(new Color(35, 197, 112, 80));
+                g2.setColor(new Color(fg.getRed(), fg.getGreen(), fg.getBlue(), 80));
                 g2.setStroke(new BasicStroke(1));
                 g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 14, 14);
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
-        badge.setFont(new Font("Segoe UI", Font.BOLD, 11));
-        badge.setForeground(GREEN);
-        badge.setOpaque(false);
+        badgeLabel.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        badgeLabel.setForeground(GREEN);
+        badgeLabel.setOpaque(false);
         JPanel badgeWrap = new JPanel(new FlowLayout(FlowLayout.RIGHT, 16, 13));
         badgeWrap.setBackground(PANEL);
-        badgeWrap.add(badge);
+        badgeWrap.add(badgeLabel);
         topBar.add(badgeWrap, BorderLayout.EAST);
 
-        // ── Banner
         bannerLbl = new JLabel("", SwingConstants.LEFT) {
             @Override protected void paintComponent(Graphics g) {
                 if (getText().isEmpty()) return;
@@ -317,7 +242,6 @@ public class SimpleGui {
         bannerLbl.setPreferredSize(new Dimension(0, 0));
         bannerLbl.setBorder(BorderFactory.createEmptyBorder(0, 20, 0, 20));
 
-        // ── Cards
         cardsPanel = new JPanel(new GridLayout(1, 2, 16, 0));
         cardsPanel.setBackground(BG);
         cardsPanel.setBorder(BorderFactory.createEmptyBorder(18, 18, 18, 18));
@@ -358,11 +282,8 @@ public class SimpleGui {
         };
         card.setOpaque(false);
 
-        // Header
         JPanel header = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 12));
         header.setOpaque(false);
-
-        // Icône rond coloré dans le header
         JPanel iconDot = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D)g.create();
@@ -376,14 +297,11 @@ public class SimpleGui {
             @Override public Dimension getPreferredSize() { return new Dimension(22, 22); }
             { setOpaque(false); }
         };
-
         JLabel hTitle = lbl(title, 12, Font.BOLD, TEXT);
-        header.add(iconDot);
-        header.add(hTitle);
+        header.add(iconDot); header.add(hTitle);
 
         JSeparator sep = new JSeparator();
-        sep.setForeground(BORDER);
-        sep.setBackground(BORDER);
+        sep.setForeground(BORDER); sep.setBackground(BORDER);
 
         JLabel imgLbl = new JLabel(
             isLeft ? "Choisir une image dans la barre latérale" : "En attente de détection...",
@@ -399,13 +317,11 @@ public class SimpleGui {
         top.setOpaque(false);
         top.add(header, BorderLayout.CENTER);
         top.add(sep,    BorderLayout.SOUTH);
-
         card.add(top,    BorderLayout.NORTH);
         card.add(imgLbl, BorderLayout.CENTER);
         return card;
     }
 
-    // ── Status bar ────────────────────────────────────────────────────────────
     private static JPanel statusBar() {
         JPanel bar = new JPanel(new BorderLayout());
         bar.setBackground(SIDEBAR);
@@ -420,9 +336,104 @@ public class SimpleGui {
         return bar;
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  HELPERS
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── ICONS ─────────────────────────────────────────────────────────────────
+    private static JPanel drawFolderIcon(Color c) {
+        return new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D)g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(c); g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawRoundRect(1, 5, 14, 10, 2, 2);
+                g2.drawLine(1, 8, 6, 8); g2.drawLine(6, 8, 8, 5); g2.drawLine(8, 5, 15, 5);
+                g2.dispose();
+            }
+            @Override public Dimension getPreferredSize() { return new Dimension(18, 18); }
+            { setOpaque(false); }
+        };
+    }
+
+    private static JPanel drawSearchIcon(Color c) {
+        return new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D)g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(c); g2.setStroke(new BasicStroke(1.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawOval(2, 2, 10, 10); g2.drawLine(10, 10, 15, 15);
+                g2.dispose();
+            }
+            @Override public Dimension getPreferredSize() { return new Dimension(18, 18); }
+            { setOpaque(false); }
+        };
+    }
+
+    private static JPanel drawVideoIcon(Color c) {
+        return new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D)g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(c); g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawRoundRect(1, 4, 10, 10, 2, 2);
+                int[] px = {12, 16, 12}; int[] py = {5, 9, 13};
+                g2.drawPolygon(px, py, 3);
+                g2.dispose();
+            }
+            @Override public Dimension getPreferredSize() { return new Dimension(18, 18); }
+            { setOpaque(false); }
+        };
+    }
+
+    private static JPanel drawTrashIcon(Color c) {
+        return new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D)g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(c); g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawRoundRect(3, 5, 10, 10, 2, 2);
+                g2.drawLine(1, 5, 15, 5);
+                g2.drawLine(6, 5, 6, 3); g2.drawLine(10, 5, 10, 3); g2.drawLine(6, 3, 10, 3);
+                g2.drawLine(6, 8, 6, 12); g2.drawLine(10, 8, 10, 12);
+                g2.dispose();
+            }
+            @Override public Dimension getPreferredSize() { return new Dimension(18, 18); }
+            { setOpaque(false); }
+        };
+    }
+
+    private static JButton iconBtn(String text, Color accent, JPanel icon, ActionListener action) {
+        JButton b = new JButton() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D)g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                if (getModel().isRollover()) {
+                    g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 22));
+                    g2.fillRoundRect(4, 2, getWidth()-8, getHeight()-4, 8, 8);
+                    g2.setColor(accent);
+                    g2.fillRoundRect(2, (getHeight()-20)/2, 3, 20, 3, 3);
+                }
+                if (getModel().isPressed()) {
+                    g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 40));
+                    g2.fillRoundRect(4, 2, getWidth()-8, getHeight()-4, 8, 8);
+                }
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        b.setLayout(new FlowLayout(FlowLayout.LEFT, 14, 0));
+        b.add(icon);
+        JLabel lbl = new JLabel(text);
+        lbl.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        lbl.setForeground(TEXT);
+        b.add(lbl);
+        b.setOpaque(false); b.setContentAreaFilled(false);
+        b.setBorderPainted(false); b.setFocusPainted(false);
+        b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        b.setMaximumSize(new Dimension(230, 42));
+        b.setPreferredSize(new Dimension(230, 42));
+        b.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 0));
+        b.addActionListener(action);
+        return b;
+    }
+
     private static JLabel lbl(String t, int size, int style, Color c) {
         JLabel l = new JLabel(t);
         l.setFont(new Font("Segoe UI", style, size));
@@ -432,8 +443,7 @@ public class SimpleGui {
 
     private static JSeparator divider() {
         JSeparator s = new JSeparator();
-        s.setForeground(BORDER);
-        s.setBackground(SIDEBAR);
+        s.setForeground(BORDER); s.setBackground(SIDEBAR);
         s.setMaximumSize(new Dimension(230, 1));
         return s;
     }
@@ -468,9 +478,7 @@ public class SimpleGui {
         return p;
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  LOGIC
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── LOGIC ─────────────────────────────────────────────────────────────────
     private static void loadLeft(String path) {
         try {
             ImageIcon icon = new ImageIcon(path);
@@ -485,17 +493,33 @@ public class SimpleGui {
 
     private static void clear() {
         imagePath = null;
-        imgLeft.setIcon(null);
-        imgLeft.setText("Choisir une image dans la barre latérale");
-        imgRight.setIcon(null);
-        imgRight.setText("En attente de détection...");
-        bannerLbl.setText("");
-        bannerLbl.setPreferredSize(new Dimension(0, 0));
+        imgLeft.setIcon(null);  imgLeft.setText("Choisir une image dans la barre latérale");
+        imgRight.setIcon(null); imgRight.setText("En attente de détection...");
+        bannerLbl.setText(""); bannerLbl.setPreferredSize(new Dimension(0, 0));
         if (bannerLbl.getParent() != null) {
             bannerLbl.getParent().revalidate();
             bannerLbl.getParent().repaint();
         }
         status("Effacé.");
+    }
+
+    private static void openVideo() {
+        try {
+            // Force VLC path avant d'ouvrir
+            System.setProperty("jna.library.path",  "C:\\Program Files\\VideoLAN\\VLC");
+            System.setProperty("vlcj.library.path", "C:\\Program Files\\VideoLAN\\VLC");
+            VideoDetectionWindow win = new VideoDetectionWindow();
+            win.setLocationRelativeTo(mainFrame);
+            win.setVisible(true);
+            status("Fenêtre vidéo ouverte.");
+        } catch (UnsatisfiedLinkError | NoClassDefFoundError err) {
+            JOptionPane.showMessageDialog(mainFrame,
+                "<html><b>VLC introuvable.</b><br>Installez VLC 64 bits depuis videolan.org</html>",
+                "VLC requis", JOptionPane.ERROR_MESSAGE);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(mainFrame,
+                "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private static void detect() {
@@ -504,10 +528,11 @@ public class SimpleGui {
                 "Info", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
-        status("Détection en cours…");
+        status("Détection en cours… (" + modelType + ")");
         new Thread(() -> {
             try {
-                URL url = new URL("http://127.0.0.1:5000/predict");
+                String apiUrl = "http://127.0.0.1:5000/predict?model=" + modelType;
+                URL url = new URL(apiUrl);
                 HttpURLConnection con = (HttpURLConnection) url.openConnection();
                 con.setRequestMethod("POST");
                 con.setDoOutput(true);
@@ -517,24 +542,16 @@ public class SimpleGui {
                     byte[] buf = new byte[4096]; int n;
                     while ((n = fis.read(buf)) != -1) os.write(buf, 0, n);
                 }
-                BufferedReader br = new BufferedReader(
-                    new InputStreamReader(con.getInputStream()));
+                BufferedReader br = new BufferedReader(new InputStreamReader(con.getInputStream()));
                 StringBuilder sb = new StringBuilder();
-                String line;
-                while ((line = br.readLine()) != null) sb.append(line);
+                String line; while ((line = br.readLine()) != null) sb.append(line);
                 br.close();
                 String resp = sb.toString();
                 String cls = "Inconnu", b64 = null;
                 int ci = resp.indexOf("\"class\"");
-                if (ci != -1) {
-                    int c=resp.indexOf(":",ci), qs=resp.indexOf("\"",c), qe=resp.indexOf("\"",qs+1);
-                    cls = resp.substring(qs+1, qe);
-                }
+                if (ci != -1) { int c=resp.indexOf(":",ci),qs=resp.indexOf("\"",c),qe=resp.indexOf("\"",qs+1); cls=resp.substring(qs+1,qe); }
                 int ii = resp.indexOf("\"image\"");
-                if (ii != -1) {
-                    int c=resp.indexOf(":",ii), qs=resp.indexOf("\"",c), qe=resp.indexOf("\"",qs+1);
-                    b64 = resp.substring(qs+1, qe);
-                }
+                if (ii != -1) { int c=resp.indexOf(":",ii),qs=resp.indexOf("\"",c),qe=resp.indexOf("\"",qs+1); b64=resp.substring(qs+1,qe); }
                 final String label = formatLabel(cls);
                 final String img64 = b64;
                 SwingUtilities.invokeLater(() -> {
@@ -550,8 +567,7 @@ public class SimpleGui {
                             ImageIcon ic = new ImageIcon(bytes);
                             int w = (int)(ic.getIconWidth()  * zoom);
                             int h = (int)(ic.getIconHeight() * zoom);
-                            imgRight.setIcon(new ImageIcon(
-                                ic.getImage().getScaledInstance(w, h, Image.SCALE_SMOOTH)));
+                            imgRight.setIcon(new ImageIcon(ic.getImage().getScaledInstance(w, h, Image.SCALE_SMOOTH)));
                             imgRight.setText(null);
                         } catch (Exception ex) { imgRight.setText("Erreur affichage."); }
                     }
@@ -561,8 +577,8 @@ public class SimpleGui {
             } catch (Exception ex) {
                 SwingUtilities.invokeLater(() -> {
                     status("Erreur : " + ex.getMessage());
-                    JOptionPane.showMessageDialog(null,
-                        "Erreur API : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(null, "Erreur API : " + ex.getMessage(),
+                        "Erreur", JOptionPane.ERROR_MESSAGE);
                 });
             }
         }).start();
@@ -571,8 +587,7 @@ public class SimpleGui {
     private static String formatLabel(String raw) {
         if (raw == null) return "Inconnu";
         String l = raw.toLowerCase().trim();
-        if (l.startsWith("speed_"))
-            return "Vitesse : " + l.replace("speed_","").replaceAll("[^0-9]","") + " km/h";
+        if (l.startsWith("speed_")) return "Vitesse : " + l.replace("speed_","").replaceAll("[^0-9]","") + " km/h";
         switch (l) {
             case "stop":       return "STOP";
             case "give_way":
@@ -581,9 +596,7 @@ public class SimpleGui {
             case "no_parking": return "Stationnement interdit";
             case "pedestrian": return "Passage piéton";
             case "roundabout": return "Rond-point";
-            default:
-                String s = raw.replace("_"," ");
-                return s.substring(0,1).toUpperCase() + s.substring(1);
+            default: String s=raw.replace("_"," "); return s.substring(0,1).toUpperCase()+s.substring(1);
         }
     }
 
