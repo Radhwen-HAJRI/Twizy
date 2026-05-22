@@ -102,7 +102,7 @@ Twizzy/
 │       └── DatabaseManager.java  → Gestion MySQL
 ├── Detection_panneaux/
 │   └── my_model.keras            → Modèle CNN TensorFlow entraîné
-├── TWIZZY_dataset/               → Dataset YOLOv8 (935 images)
+├── TWIZZY_dataset/               → Dataset YOLOv8 (37 778 fichiers, augmentation incluse)
 ├── runs/detect/best_train/
 │   └── weights/best2.pt          → Poids YOLOv8 entraîné
 ├── tensorFlow/                   → Scripts entraînement TensorFlow
