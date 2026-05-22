@@ -31,7 +31,7 @@ def load_label_map(path):
     return label_map
 # Charger le modèle
 model = tf.keras.models.load_model("Detection_panneaux/my_model.keras")  # Ajuste le chemin si besoin
-label_map = load_label_map('Detection_panneaux-3/test/objects_label_map.pbtxt')
+label_map = load_label_map('Detection_panneaux/test/objects_label_map.pbtxt')
 
 def preprocess_image(image_path):
     img = Image.open(image_path).resize((224, 224))
