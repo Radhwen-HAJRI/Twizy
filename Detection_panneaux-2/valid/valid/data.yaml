@@ -1,0 +1,6 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 54
+names: ['Speed_Limit_10', 'Speed_Limit_100', 'Speed_Limit_110', 'Speed_Limit_120', 'Speed_Limit_20', 'Speed_Limit_30', 'Speed_Limit_40', 'Speed_Limit_50', 'Speed_Limit_60', 'Speed_Limit_70', 'Speed_Limit_80', 'Speed_Limit_90', 'Stop', 'Ahead_only', 'Beware_of_ice_snow', 'Bicycles_crossing', 'Bumpy_road', 'Children_crossing', 'Dangerous_curve_to_the_left', 'Dangerous_curve_to_the_right', 'Double_curve', 'End_of_all_speed_and_passing_limits', 'End_of_no_passing', 'End_of_no_passing_by_vehicles_over_3_5_metric_tons', 'End_of_speed_limit_80_km_h', 'General_caution', 'Go_straight_or_left', 'Go_straight_or_right', 'Keep_left', 'Keep_right', 'No_entry', 'No_passing', 'No_passing_for_vehicles_over_3_5_metric_tons', 'No_vehicles', 'Pedestrians', 'Priority_road', 'Right_of_way_at_the_next_intersection', 'Road_narrows_on_the_right', 'Road_work', 'Roundabout_mandatory', 'Slippery_road', 'Speed_limit_130_km_h', 'Traffic_signals', 'Turn_left_ahead', 'Turn_right_ahead', 'Vehicles_over_3_5_metric_tons_prohibited', 'Wild_animals_crossing', 'Yield', 'green-lights', 'red-lights', 'traffic-lights', 'turn-left', 'turn-right', 'yellow-lights']

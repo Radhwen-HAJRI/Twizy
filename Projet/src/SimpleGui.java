@@ -1,5 +1,6 @@
 import javax.swing.*;
 import javax.swing.border.*;
+import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
@@ -9,6 +10,8 @@ import java.net.URL;
 import java.util.Base64;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class SimpleGui {
 
@@ -25,9 +28,12 @@ public class SimpleGui {
     private static final Color TEXT_MUTED   = new Color(100,110, 130);
     private static final Color BORDER       = new Color(35,  42,  60);
     private static final Color BORDER_LIGHT = new Color(55,  65,  90);
+    private static final Color TABLE_BG     = new Color(16,  20,  30);
+    private static final Color TABLE_ROW    = new Color(22,  27,  40);
+    private static final Color TABLE_ALT    = new Color(18,  23,  35);
 
     private static String   imagePath  = null;
-    private static String   modelType  = "yolov8"; // "yolov8" ou "tensorflow"
+    private static String   modelType  = "yolov8";
     private static JLabel   imgLeft;
     private static JLabel   imgRight;
     private static JLabel   statusLbl;
@@ -36,18 +42,24 @@ public class SimpleGui {
     private static double   zoom       = 0.6;
     private static JFrame   mainFrame;
 
+    // ── Historique ────────────────────────────────────────────────────────────
+    private static DefaultTableModel historyModel;
+    private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("HH:mm:ss");
+
     public static void main(String[] args) {
         try { com.formdev.flatlaf.FlatDarkLaf.setup(); }
         catch (Exception ignored) {}
         UIManager.put("Panel.background", PANEL);
+        DatabaseManager.connect();
+        Runtime.getRuntime().addShutdownHook(new Thread(DatabaseManager::disconnect));
         SwingUtilities.invokeLater(SimpleGui::launch);
     }
 
     private static void launch() {
         mainFrame = new JFrame("Twizzy — Détection de Panneaux");
         mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        mainFrame.setSize(1440, 880);
-        mainFrame.setMinimumSize(new Dimension(1100, 700));
+        mainFrame.setSize(1440, 960);
+        mainFrame.setMinimumSize(new Dimension(1100, 750));
         mainFrame.setLocationRelativeTo(null);
         mainFrame.setBackground(BG);
         mainFrame.setLayout(new BorderLayout());
@@ -65,7 +77,6 @@ public class SimpleGui {
         sb.setPreferredSize(new Dimension(230, 0));
         sb.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, BORDER));
 
-        // Logo
         sb.add(Box.createVerticalStrut(22));
         JPanel logoRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 0));
         logoRow.setBackground(SIDEBAR);
@@ -105,7 +116,6 @@ public class SimpleGui {
         sb.add(divider());
         sb.add(Box.createVerticalStrut(16));
 
-        // Actions
         sb.add(sectionTitle("ACTIONS"));
         sb.add(Box.createVerticalStrut(6));
         sb.add(iconBtn("Choisir une image", BLUE, drawFolderIcon(BLUE), e -> {
@@ -128,7 +138,6 @@ public class SimpleGui {
         sb.add(divider());
         sb.add(Box.createVerticalStrut(14));
 
-        // Modèle
         sb.add(sectionTitle("MODÈLE"));
         sb.add(Box.createVerticalStrut(8));
         JPanel modelPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 18, 0));
@@ -142,9 +151,8 @@ public class SimpleGui {
         modelBox.setMaximumSize(new Dimension(190, 28));
         modelBox.addActionListener(e -> {
             modelType = modelBox.getSelectedIndex() == 0 ? "yolov8" : "tensorflow";
-            status("Modèle : " + (modelBox.getSelectedIndex() == 0 ? "YOLOv8" : "TensorFlow CNN"));
-            // Mettre à jour le badge
             updateBadge(modelBox.getSelectedIndex() == 0 ? "YOLOv8" : "CNN");
+            status("Modèle : " + modelType);
         });
         modelPanel.add(modelBox);
         sb.add(modelPanel);
@@ -153,7 +161,6 @@ public class SimpleGui {
         sb.add(divider());
         sb.add(Box.createVerticalStrut(14));
 
-        // Options
         sb.add(sectionTitle("OPTIONS"));
         sb.add(Box.createVerticalStrut(10));
         sb.add(sliderRow("Zoom", 20, 100, 60, v -> {
@@ -177,7 +184,6 @@ public class SimpleGui {
         return sb;
     }
 
-    // ── Badge (mise à jour dynamique) ─────────────────────────────────────────
     private static JLabel badgeLabel;
 
     private static void updateBadge(String text) {
@@ -193,6 +199,7 @@ public class SimpleGui {
         JPanel root = new JPanel(new BorderLayout());
         root.setBackground(BG);
 
+        // Top bar
         JPanel topBar = new JPanel(new BorderLayout());
         topBar.setBackground(PANEL);
         topBar.setPreferredSize(new Dimension(0, 52));
@@ -224,6 +231,7 @@ public class SimpleGui {
         badgeWrap.add(badgeLabel);
         topBar.add(badgeWrap, BorderLayout.EAST);
 
+        // Banner
         bannerLbl = new JLabel("", SwingConstants.LEFT) {
             @Override protected void paintComponent(Graphics g) {
                 if (getText().isEmpty()) return;
@@ -242,9 +250,10 @@ public class SimpleGui {
         bannerLbl.setPreferredSize(new Dimension(0, 0));
         bannerLbl.setBorder(BorderFactory.createEmptyBorder(0, 20, 0, 20));
 
+        // Cards
         cardsPanel = new JPanel(new GridLayout(1, 2, 16, 0));
         cardsPanel.setBackground(BG);
-        cardsPanel.setBorder(BorderFactory.createEmptyBorder(18, 18, 18, 18));
+        cardsPanel.setBorder(BorderFactory.createEmptyBorder(18, 18, 8, 18));
         cardsPanel.add(buildCard("Image originale",       BLUE,  true));
         cardsPanel.add(buildCard("Résultat de détection", GREEN, false));
 
@@ -254,14 +263,103 @@ public class SimpleGui {
         scroll.setBorder(null);
         scroll.getViewport().setBackground(BG);
 
+        // Centre avec banner + cards
         JPanel centre = new JPanel(new BorderLayout());
         centre.setBackground(BG);
         centre.add(bannerLbl, BorderLayout.NORTH);
         centre.add(scroll,    BorderLayout.CENTER);
+        centre.add(buildHistoryPanel(), BorderLayout.SOUTH);
 
         root.add(topBar,  BorderLayout.NORTH);
         root.add(centre,  BorderLayout.CENTER);
         return root;
+    }
+
+    // ── HISTORIQUE ────────────────────────────────────────────────────────────
+    private static JPanel buildHistoryPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(PANEL);
+        panel.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER));
+        panel.setPreferredSize(new Dimension(0, 160));
+
+        // Header
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(PANEL);
+        header.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 16));
+
+        JLabel title = lbl("  Historique des détections", 12, Font.BOLD, TEXT);
+        header.add(title, BorderLayout.WEST);
+
+        JButton clearBtn = new JButton("Effacer l'historique");
+        clearBtn.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        clearBtn.setForeground(TEXT_MUTED);
+        clearBtn.setBackground(new Color(35, 42, 60));
+        clearBtn.setBorderPainted(false);
+        clearBtn.setFocusPainted(false);
+        clearBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        clearBtn.addActionListener(e -> {
+            historyModel.setRowCount(0);
+            status("Historique effacé.");
+        });
+        header.add(clearBtn, BorderLayout.EAST);
+        panel.add(header, BorderLayout.NORTH);
+
+        // Table
+        String[] cols = {"Heure", "Modèle", "Panneau détecté", "Fichier"};
+        historyModel = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+
+        JTable table = new JTable(historyModel);
+        table.setBackground(TABLE_BG);
+        table.setForeground(TEXT);
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        table.setRowHeight(28);
+        table.setShowGrid(false);
+        table.setIntercellSpacing(new Dimension(0, 0));
+        table.getTableHeader().setBackground(new Color(22, 27, 40));
+        table.getTableHeader().setForeground(TEXT_MUTED);
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 11));
+        table.getTableHeader().setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER));
+        table.setSelectionBackground(new Color(56, 139, 253, 40));
+        table.setSelectionForeground(TEXT);
+
+        // Colonnes largeurs
+        table.getColumnModel().getColumn(0).setPreferredWidth(70);
+        table.getColumnModel().getColumn(1).setPreferredWidth(100);
+        table.getColumnModel().getColumn(2).setPreferredWidth(200);
+        table.getColumnModel().getColumn(3).setPreferredWidth(400);
+
+        // Alternance couleurs lignes
+        table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+            @Override public Component getTableCellRendererComponent(
+                    JTable t, Object val, boolean sel, boolean foc, int row, int col) {
+                Component c = super.getTableCellRendererComponent(t, val, sel, foc, row, col);
+                if (!sel) {
+                    c.setBackground(row % 2 == 0 ? TABLE_ROW : TABLE_ALT);
+                    c.setForeground(col == 2 ? GREEN : TEXT);
+                }
+                setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10));
+                return c;
+            }
+        });
+
+        JScrollPane tableScroll = new JScrollPane(table);
+        tableScroll.setBorder(null);
+        tableScroll.getViewport().setBackground(TABLE_BG);
+        panel.add(tableScroll, BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    private static void addToHistory(String modele, String classe, String path) {
+        String heure = LocalDateTime.now().format(FMT);
+        String label = formatLabel(classe);
+        String fichier = path != null ? new File(path).getName() : "-";
+        SwingUtilities.invokeLater(() -> {
+            historyModel.insertRow(0, new Object[]{heure, modele.toUpperCase(), label, fichier});
+            if (historyModel.getRowCount() > 50) historyModel.removeRow(50);
+        });
     }
 
     private static JPanel buildCard(String title, Color accent, boolean isLeft) {
@@ -281,7 +379,6 @@ public class SimpleGui {
             }
         };
         card.setOpaque(false);
-
         JPanel header = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 12));
         header.setOpaque(false);
         JPanel iconDot = new JPanel() {
@@ -299,20 +396,16 @@ public class SimpleGui {
         };
         JLabel hTitle = lbl(title, 12, Font.BOLD, TEXT);
         header.add(iconDot); header.add(hTitle);
-
         JSeparator sep = new JSeparator();
         sep.setForeground(BORDER); sep.setBackground(BORDER);
-
         JLabel imgLbl = new JLabel(
             isLeft ? "Choisir une image dans la barre latérale" : "En attente de détection...",
             SwingConstants.CENTER);
         imgLbl.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         imgLbl.setForeground(TEXT_MUTED);
         imgLbl.setOpaque(false);
-
         if (isLeft) imgLeft  = imgLbl;
         else        imgRight = imgLbl;
-
         JPanel top = new JPanel(new BorderLayout());
         top.setOpaque(false);
         top.add(header, BorderLayout.CENTER);
@@ -351,7 +444,6 @@ public class SimpleGui {
             { setOpaque(false); }
         };
     }
-
     private static JPanel drawSearchIcon(Color c) {
         return new JPanel() {
             @Override protected void paintComponent(Graphics g) {
@@ -365,7 +457,6 @@ public class SimpleGui {
             { setOpaque(false); }
         };
     }
-
     private static JPanel drawVideoIcon(Color c) {
         return new JPanel() {
             @Override protected void paintComponent(Graphics g) {
@@ -381,7 +472,6 @@ public class SimpleGui {
             { setOpaque(false); }
         };
     }
-
     private static JPanel drawTrashIcon(Color c) {
         return new JPanel() {
             @Override protected void paintComponent(Graphics g) {
@@ -440,14 +530,12 @@ public class SimpleGui {
         l.setForeground(c);
         return l;
     }
-
     private static JSeparator divider() {
         JSeparator s = new JSeparator();
         s.setForeground(BORDER); s.setBackground(SIDEBAR);
         s.setMaximumSize(new Dimension(230, 1));
         return s;
     }
-
     private static JLabel sectionTitle(String t) {
         JLabel l = new JLabel(t);
         l.setFont(new Font("Segoe UI", Font.BOLD, 10));
@@ -456,7 +544,6 @@ public class SimpleGui {
         l.setAlignmentX(Component.LEFT_ALIGNMENT);
         return l;
     }
-
     private static JPanel sliderRow(String label, int min, int max, int init,
                                      java.util.function.IntConsumer onChange) {
         JPanel p = new JPanel();
@@ -505,7 +592,6 @@ public class SimpleGui {
 
     private static void openVideo() {
         try {
-            // Force VLC path avant d'ouvrir
             System.setProperty("jna.library.path",  "C:\\Program Files\\VideoLAN\\VLC");
             System.setProperty("vlcj.library.path", "C:\\Program Files\\VideoLAN\\VLC");
             VideoDetectionWindow win = new VideoDetectionWindow();
@@ -542,7 +628,8 @@ public class SimpleGui {
                     byte[] buf = new byte[4096]; int n;
                     while ((n = fis.read(buf)) != -1) os.write(buf, 0, n);
                 }
-                BufferedReader br = new BufferedReader(new InputStreamReader(con.getInputStream()));
+                java.io.BufferedReader br = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(con.getInputStream()));
                 StringBuilder sb = new StringBuilder();
                 String line; while ((line = br.readLine()) != null) sb.append(line);
                 br.close();
@@ -552,8 +639,10 @@ public class SimpleGui {
                 if (ci != -1) { int c=resp.indexOf(":",ci),qs=resp.indexOf("\"",c),qe=resp.indexOf("\"",qs+1); cls=resp.substring(qs+1,qe); }
                 int ii = resp.indexOf("\"image\"");
                 if (ii != -1) { int c=resp.indexOf(":",ii),qs=resp.indexOf("\"",c),qe=resp.indexOf("\"",qs+1); b64=resp.substring(qs+1,qe); }
-                final String label = formatLabel(cls);
-                final String img64 = b64;
+                final String label  = formatLabel(cls);
+                final String img64  = b64;
+                final String clsFin = cls;
+
                 SwingUtilities.invokeLater(() -> {
                     bannerLbl.setText("  ✓   Panneau détecté : " + label);
                     bannerLbl.setPreferredSize(new Dimension(0, 42));
@@ -573,6 +662,10 @@ public class SimpleGui {
                     }
                     cardsPanel.revalidate(); cardsPanel.repaint();
                     status("✓  Détecté : " + label);
+
+                    // Sauvegarde MySQL + historique
+                    DatabaseManager.saveDetection(modelType, clsFin, 0.0f, imagePath);
+                    addToHistory(modelType, clsFin, imagePath);
                 });
             } catch (Exception ex) {
                 SwingUtilities.invokeLater(() -> {

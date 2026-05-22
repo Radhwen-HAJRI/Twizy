@@ -25,7 +25,7 @@ except Exception as e:
 # YOLOv8
 try:
     from ultralytics import YOLO
-    yolo_model = YOLO("runs/detect/best_train/weights/best.pt")
+    yolo_model = YOLO("runs/detect/best_train/weights/best2.pt")
     print("✓ YOLOv8 model loaded")
     YOLO_OK = True
 except Exception as e:
